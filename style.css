@@ -116,3 +116,20 @@ code {
   background-color: ##FFFFC5; /* Yellow highlight */
   padding: 2px 5px;
 }
+
+/* Container for the gifs */
+.gif-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto); /* 3 side-by-side */
+  gap: 20px; /* space between gifs */
+  justify-content: center; /* center the whole row */
+  margin-top: 40px; /* optional spacing from top */
+}
+
+/* Style for each gif */
+.gif-grid img {
+  width: 300px; /* adjust size as needed */
+  height: auto;
+  border-radius: 8px; /* optional rounded corners */
+}
+

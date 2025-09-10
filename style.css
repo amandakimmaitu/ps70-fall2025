@@ -1,8 +1,8 @@
 body {
-    font: 20px "Gill Sans", Verdana, sans-serif;
+    font: 20px "Courier", Courier, sans-serif;
     line-height: 1.8;
     color: #000000;
-    background-color: #dcdcdc;
+    background-color: #ffffff;
     padding-top: 0px !important;
   }
 
@@ -23,8 +23,8 @@ a {
 }
 
 nav {
-  background-color: #dcdcdc;
-  color: #EEE7E8;
+  background-color: #ffffff;
+  color: #ffffff;
   padding: 50px 0px;
 }
 
@@ -103,4 +103,16 @@ code {
 
 #aboutme {
   padding: 20px;
+}
+
+.center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 50%;
+}
+
+.highlight {
+  background-color: ##FFFFC5; /* Yellow highlight */
+  padding: 2px 5px;
 }

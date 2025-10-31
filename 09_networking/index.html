@@ -138,39 +138,8 @@ void servePage(WiFiClient& client, int adc, int dryPct) {
   client.println("<a href='/on'><button class='on'>Start Watering!</button></a>");
   client.println("<a href='/off'><button class='off'>Stop Watering!</button></a>");
   client.println("</p>");
-  client.println("</div></body></html>");
-}
+  client.println("</div></body></html>
 
-void loop() {
-  // Read sensor
-  int adc = analogRead(SOIL_PIN);
-  int dryPct = drynessPercent(adc);
-
-  WiFiClient client = server.available();
-  if (!client) return;
-
-  // Wait for a request line
-  String req = client.readStringUntil('\n');  // first line of the HTTP request
-  req.trim();
-  Serial.println(req);
-
-  // Very simple routing
-  if (req.startsWith("GET /on")) {
-    pumpSet(true);
-  } else if (req.startsWith("GET /off")) {
-    pumpSet(false);
-  }
-  // Drain the rest of the HTTP headers
-  while (client.connected()) {
-    String line = client.readStringUntil('\n');
-    if (line == "\r" || line.length() == 0) break;
-  }
-
-  // Send page
-  servePage(client, adc, dryPct);
-  delay(1);
-  client.stop();
-}
   </code></pre>
 
 <p class="p1">Happy Halloween everyone! Many are saying it is the spookiest time of year :-)&nbsp;🎃👻</p>

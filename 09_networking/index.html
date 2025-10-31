@@ -142,7 +142,6 @@ void servePage(WiFiClient& client, int adc, int dryPct) {
 
   </code></pre>
 
-<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -160,16 +159,13 @@ void servePage(WiFiClient& client, int adc, int dryPct) {
 </head>
 <body>
   <div class="card">
-    <h2>Amanda's Awesome Greenhouse: Plant Watering Manual Override</h2>
+    <h3>Amanda's Awesome Greenhouse: Plant Watering Manual Override</h3>
     <div class="row"><b>Dryness:</b> <span id="dryness">…</span></div>
     <div class="row"><b>Pump:</b> <span id="pumpState">…</span></div>
     <div class="row" style="margin-top:.6rem">
       <button class="on"  id="turn-on">Start Watering!</button>
       <button class="off" id="turn-off">Stop Watering!</button>
     </div>
-    <p style="color:#666;font-size:.9rem;margin-top:.6rem">
-      Writes to <code>/pump/command</code>; ESP32 updates <code>/pump/state</code> & <code>/sensor/*</code>.
-    </p>
   </div>
 
   <!-- Firebase v7 SDKs to match your class instructions -->

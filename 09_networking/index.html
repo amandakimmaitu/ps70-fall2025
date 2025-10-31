@@ -130,18 +130,6 @@ void servePage(WiFiClient& client, int adc, int dryPct) {
   client.println("Content-Type: text/html; charset=utf-8");
   client.println("Connection: close");
   client.println();
-  client.print(F(
-    "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
-    "<meta http-equiv='refresh' content='2'>"
-    "<style>"
-    "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:20px}"
-    "button{font-size:1.1rem;padding:.6rem 1rem;margin:.3rem;border-radius:.5rem;border:1px solid #999}"
-    ".on{background:#e6ffe6}.off{background:#ffecec}"
-    ".card{padding:1rem;border:1px solid #ddd;border-radius:.75rem;max-width:420px}"
-    "</style></head><body>"
-    "<div class='card'>"
-    "<h2>Amanda's Awesome Greenhouse: Plant Watering Manual Override</h2>"
-  ));
   client.print("<p><b>Dryness:</b> "); client.print(dryPct); client.println("%</p>");
   client.print("<p><b>Pump:</b> ");
   client.print(pumpOn ? "ON" : "OFF");

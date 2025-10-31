@@ -23,19 +23,169 @@
 <div class="textcontainer">
 <p class="margin">   </p>
 
-<h3>Week 9: Radio, WiFi, Bluetooth (IoT)</h3>
+<h1>🕸️ Week 9: Radio, WiFi, Bluetooth (IoT) 🕸️</h1>
 
+<br></br>
 
-<p class="margin">   </p>
-<div class="flexrow">
-  <a id="btn" href="wk9.zip" download>Download my files from this week!
-  </a>
-</div>
-<p class="margin">   </p>
+<h2 class="p1">Part I: Program Something with IoT</h2>
 
-<h4>Assignment: [Program something with IOT]</h4>
+<br></br>
 
+<p class="p1">My goal for IoT week was to build a manual override for the automated plant-watering system I created during my MVP phase. Different plants need different watering cadences, and sometimes I don&rsquo;t want the pump to activate every time the soil registers as &ldquo;dry.&rdquo; The manual control also makes it easier to demonstrate the system at the final fair&mdash;since the soil will likely already be saturated, I can still show that the pump and interface work on command.</p>
 
+<p class="p1">I began with the <a href="https://nathanmelenbrink.github.io/lab/networking/huzzah1.html">basic LAN server tutorial</a>&nbsp;from the course website and adapted the code to control my existing pump motor instead of an LED. One key adjustment was moving the wire from pin 27 to pin 34 to ensure compatibility with the Wi-Fi functionality.</p>
+
+<p class="p1">Below is a screenshot of the interface. It allows the user to easily toggle the pump on or off while viewing real-time soil-moisture readings, providing context for manual watering decisions.</p>
+
+<img src="Interface.png" alt="interfact" class="center">
+<p style="text-align: center;"><em>Manual watering interface</em></p>
+
+<p class="p1">Here&rsquo;s the code:</p>
+
+<title>Water Pump Arduino Code</title>
+  <style>
+    pre {
+      background-color: #f4f4f4; /* gray box */
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    code {
+      font-family: monospace;
+      background: none;  /* make sure text itself has no gray background */
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  
+  <pre><code>
+
+#include <WiFi.h>
+
+// ====== WiFi ======
+const char* ssid     = "MAKERSPACE";
+const char* password = "12345678";
+
+// ====== Pins ======
+const int SOIL_PIN = 34;
+const int AIA_PIN  = 26;  // L9110 A-IA
+const int AIB_PIN  = 25;  // L9110 A-IB
+
+// Calibration of wet and dry
+int WET_ADC = 1400; 
+int DRY_ADC = 3000;
+
+WiFiServer server(80);
+bool pumpOn = false;
+
+void pumpSet(bool on) {
+  pumpOn = on;
+  digitalWrite(AIA_PIN, on ? HIGH : LOW);
+  digitalWrite(AIB_PIN, LOW);
+}
+
+int clampi(int v,int lo,int hi){ return v<lo?lo:(v>hi?hi:v); }
+
+// Map ADC to 0..100 dryness, auto-orient
+int drynessPercent(int avg){
+  if (WET_ADC == DRY_ADC) return 0;
+  if (DRY_ADC > WET_ADC) {
+    float f = float(avg - WET_ADC) / float(DRY_ADC - WET_ADC);
+    return clampi(int(f * 100.0f), 0, 100);
+  } else {
+    float f = float(WET_ADC - avg) / float(WET_ADC - DRY_ADC);
+    return clampi(int(f * 100.0f), 0, 100);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(300);
+
+  pinMode(AIA_PIN, OUTPUT);
+  pinMode(AIB_PIN, OUTPUT);
+  pumpSet(false); // start OFF
+
+  analogReadResolution(12); // 0..4095
+
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print('.');
+  }
+  Serial.println("\nWiFi connected. IP address:");
+  Serial.println(WiFi.localIP());
+
+  server.begin();
+}
+
+void servePage(WiFiClient& client, int adc, int dryPct) {
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html; charset=utf-8");
+  client.println("Connection: close");
+  client.println();
+  client.print(F(
+    "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+    "<meta http-equiv='refresh' content='2'>"
+    "<style>"
+    "body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:20px}"
+    "button{font-size:1.1rem;padding:.6rem 1rem;margin:.3rem;border-radius:.5rem;border:1px solid #999}"
+    ".on{background:#e6ffe6}.off{background:#ffecec}"
+    ".card{padding:1rem;border:1px solid #ddd;border-radius:.75rem;max-width:420px}"
+    "</style></head><body>"
+    "<div class='card'>"
+    "<h2>Amanda's Awesome Greenhouse: Plant Watering Manual Override</h2>"
+  ));
+  client.print("<p><b>Dryness:</b> "); client.print(dryPct); client.println("%</p>");
+  client.print("<p><b>Pump:</b> ");
+  client.print(pumpOn ? "ON" : "OFF");
+  client.println("</p>");
+  client.println("<p>");
+  client.println("<a href='/on'><button class='on'>Start Watering!</button></a>");
+  client.println("<a href='/off'><button class='off'>Stop Watering!</button></a>");
+  client.println("</p>");
+  client.println("</div></body></html>");
+}
+
+void loop() {
+  // Read sensor
+  int adc = analogRead(SOIL_PIN);
+  int dryPct = drynessPercent(adc);
+
+  WiFiClient client = server.available();
+  if (!client) return;
+
+  // Wait for a request line
+  String req = client.readStringUntil('\n');  // first line of the HTTP request
+  req.trim();
+  Serial.println(req);
+
+  // Very simple routing
+  if (req.startsWith("GET /on")) {
+    pumpSet(true);
+  } else if (req.startsWith("GET /off")) {
+    pumpSet(false);
+  }
+  // Drain the rest of the HTTP headers
+  while (client.connected()) {
+    String line = client.readStringUntil('\n');
+    if (line == "\r" || line.length() == 0) break;
+  }
+
+  // Send page
+  servePage(client, adc, dryPct);
+  delay(1);
+  client.stop();
+}
+  </code></pre>
+
+<p class="p1">Happy Halloween everyone! Many are saying it is the spookiest time of year :-)&nbsp;🎃👻</p>
 
 
 </div>

@@ -39,16 +39,19 @@
     storageBucket: "watering-system-override.firebasestorage.app",
     messagingSenderId: "8484160068",
     appId: "1:8484160068:web:a3decbfbc160f699d3f211"
-    // measurementId optional
   };
   firebase.initializeApp(firebaseConfig);
 
-  // DB refs we use
-  var db = firebase.database();
+  // Database references
+  var db       = firebase.database();
   var cmdRef   = db.ref("/pump/command");
   var stateRef = db.ref("/pump/state");
-  var adcRef   = db.ref("/sensor/soilAdc");
+  var adcRef   = db.ref("/sensor/soilAdc");     // kept for background logging
   var dryRef   = db.ref("/sensor/drynessPct");
+
+  // Elements
+  var pumpEl = document.getElementById('pumpState');
+  var dryEl  = document.getElementById('dryness');
 
   // Buttons
   document.getElementById('turn-on').addEventListener('click', function(){
@@ -61,14 +64,18 @@
 
   // Live UI updates
   stateRef.on('value', function(snap){
-    document.getElementById('pumpState').textContent = snap.val() || 'UNKNOWN';
+    if (pumpEl) pumpEl.textContent = snap.val() || 'UNKNOWN';
   });
-  adcRef.on('value', function(snap){
-    document.getElementById('soilAdc').textContent = (snap.val() !== null) ? snap.val() : '—';
-  });
+
   dryRef.on('value', function(snap){
+    if (!dryEl) return;
     var v = snap.val();
-    document.getElementById('dryness').textContent = (v !== null) ? (v + '%') : '—';
+    dryEl.textContent = (v !== null) ? (v + '%') : '—';
+  });
+
+  // Background listener (optional)
+  adcRef.on('value', function(snap){
+    console.log("Soil ADC:", snap.val());
   });
   </script>
 </body>

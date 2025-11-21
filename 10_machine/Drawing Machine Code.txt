@@ -1,0 +1,368 @@
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AccelStepper.h>
+#include <ESP32Servo.h>
+#include <math.h>    // for sin() and cos()
+
+// -------------------- Steppers (X/Y axes) --------------------
+// AccelStepper interface type: 1 = DRIVER (step + dir)
+AccelStepper stepper_X1(1, 22, 23); // STEP = 22, DIR = 23
+AccelStepper stepper_Y (1, 26, 27); // STEP = 26, DIR = 27
+
+// -------------------- Servo Motor (Z / pen up/down) --------------------
+Servo penServo;
+
+const int SERVO_PIN       = 25;
+const int PEN_DOWN_ANGLE  = 180;  // adjust as needed
+const int PEN_UP_ANGLE    = 60;   // adjust as needed
+
+// -------------------- WiFi & Web Server --------------------
+const char* ssid     = "MAKERSPACE";
+const char* password = "12345678";
+
+String message = "";
+
+// Async Web Server and WebSocket
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+
+// Values received from HTML form
+String steps_X;
+String steps_Y;
+bool   newRequest    = false;  // new XY move command from web
+bool   isDrawing     = false;  // true while moving to a web target
+bool   circleRequest = false;  // request to draw a circle from web
+bool   resetRequest  = false;  // request to reset position to (0,0)
+
+// -------------------- HTML page --------------------
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+  <title>The Ephemeral Drawing Machine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <div class="topnav">
+    <h3>The Ephemeral Drawing Machine</h3>
+  </div>
+  <div class="content">
+    <form>
+      <label for="steps_x">X Position:</label>
+      <input type="number" id="steps_x" name="steps_x">
+      <br><br>
+      <label for="steps_y">Y Position:</label>
+      <input type="number" id="steps_y" name="steps_y">
+    </form>
+    <br> 
+    <button onclick="submitMove()">GO (Move)</button>
+    <br><br>
+    <button onclick="sendCircle()">Draw Circle</button>
+    <br><br>
+    <button onclick="sendReset()">Reset to (0,0)</button>
+  </div>
+</body>
+<script>
+var gateway = `ws://${window.location.hostname}/ws`;
+var websocket;
+window.addEventListener('load', onload);
+
+function onload(event) {
+    initWebSocket();
+}
+
+function initWebSocket() {
+    console.log('Trying to open a WebSocket connection…');
+    websocket = new WebSocket(gateway);
+    websocket.onopen = onOpen;
+    websocket.onclose = onClose;
+    websocket.onmessage = onMessage;
+}
+
+function onOpen(event) {
+    console.log('Connection opened');
+}
+
+function onClose(event) {
+    console.log('Connection closed');
+    setTimeout(initWebSocket, 2000);
+}
+
+// Send an XY move command, format: "x&y"
+function submitMove(){
+    var steps_x = document.getElementById("steps_x").value;
+    var steps_y = document.getElementById("steps_y").value;
+    websocket.send(steps_x + "&" + steps_y);
+}
+
+// Send a special "CIRCLE" command (draw circle at current XY)
+function sendCircle(){
+    websocket.send("CIRCLE");
+}
+
+// Send a special "RESET" command (go to 0,0)
+function sendReset(){
+    websocket.send("RESET");
+}
+
+function onMessage(event) {
+    console.log("From ESP32:", event.data);
+}
+</script>
+</html>
+)rawliteral";
+
+// -------------------- WiFi init --------------------
+void initWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi ..");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    delay(1000);
+  }
+  Serial.println();
+  Serial.print("Connected, IP: ");
+  Serial.println(WiFi.localIP());
+}
+
+// -------------------- Servo helpers --------------------
+void servoDown() {
+  penServo.write(PEN_DOWN_ANGLE);
+  // optional: delay(200);
+}
+
+void servoUp() {
+  penServo.write(PEN_UP_ANGLE);
+  // optional: delay(200);
+}
+
+// -------------------- Blocking motion helpers --------------------
+// Move both steppers to a target position and wait until they arrive.
+// This is used inside predefined patterns (e.g. circle, reset).
+void moveBothToBlocking(long targetX, long targetY) {
+  stepper_X1.moveTo(targetX);
+  stepper_Y.moveTo(targetY);
+
+  while (stepper_X1.distanceToGo() != 0 || stepper_Y.distanceToGo() != 0) {
+    stepper_X1.run();
+    stepper_Y.run();
+  }
+}
+
+// Draw a "circle" using many small line segments.
+// radiusSteps: radius in step units
+// segments: number of segments (more segments = smoother circle)
+void drawCircle(long radiusSteps, int segments) {
+  // Use current position as the center of the circle
+  long centerX = stepper_X1.currentPosition();
+  long centerY = stepper_Y.currentPosition();
+
+  Serial.println("Drawing circle...");
+  Serial.print("Center X: "); Serial.println(centerX);
+  Serial.print("Center Y: "); Serial.println(centerY);
+
+  // Start at angle 0 on the circle
+  float angle = 0.0;
+  long startX = centerX + (long)(radiusSteps * cos(angle));
+  long startY = centerY + (long)(radiusSteps * sin(angle));
+
+  // Lift pen, move to first circle point
+  servoUp();
+  moveBothToBlocking(startX, startY);
+
+  // Put pen down and walk around the circle
+  servoDown();
+  for (int i = 1; i <= segments; i++) {
+    angle = (2.0 * PI * i) / segments;   // angle from 0 to 2π
+    long xi = centerX + (long)(radiusSteps * cos(angle));
+    long yi = centerY + (long)(radiusSteps * sin(angle));
+    moveBothToBlocking(xi, yi);
+  }
+
+  // Lift pen again after finishing
+  servoUp();
+  Serial.println("Circle finished.");
+}
+
+// -------------------- WebSocket handlers --------------------
+void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
+  AwsFrameInfo *info = (AwsFrameInfo*)arg;
+
+  if (info->final &&
+      info->index == 0 &&
+      info->len == len &&
+      info->opcode == WS_TEXT) {
+
+    // Null-terminate to make a C-string
+    data[len] = 0;
+    message = (char*)data;
+    String msg = message;
+
+    Serial.print("WS message: ");
+    Serial.println(msg);
+
+    // 1) Special command: draw circle
+    if (msg == "CIRCLE") {
+      circleRequest = true;
+      return;
+    }
+
+    // 2) Special command: reset to (0,0)
+    if (msg == "RESET") {
+      resetRequest = true;
+      return;
+    }
+
+    // 3) Otherwise, treat as "x&y" move command
+    int sepIndex = msg.indexOf("&");
+    if (sepIndex > 0) {
+      steps_X = msg.substring(0, sepIndex);
+      steps_Y = msg.substring(sepIndex + 1);
+
+      Serial.print("steps_X: ");
+      Serial.println(steps_X);
+      Serial.print("steps_Y: ");
+      Serial.println(steps_Y);
+
+      newRequest = true;
+    }
+  }
+}
+
+void onEvent(AsyncWebSocket *server,
+             AsyncWebSocketClient *client,
+             AwsEventType type,
+             void *arg,
+             uint8_t *data,
+             size_t len) {
+
+  switch (type) {
+    case WS_EVT_CONNECT:
+      Serial.printf("WebSocket client #%u connected from %s\n",
+                    client->id(),
+                    client->remoteIP().toString().c_str());
+      break;
+    case WS_EVT_DISCONNECT:
+      Serial.printf("WebSocket client #%u disconnected\n", client->id());
+      break;
+    case WS_EVT_DATA:
+      handleWebSocketMessage(arg, data, len);
+      break;
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+void initWebSocket() {
+  ws.onEvent(onEvent);
+  server.addHandler(&ws);
+}
+
+// Template processor (not really used here, but required by send_P)
+String processor(const String& var) {
+  if (var == "STATE") {
+    return "OFF";
+  }
+  return String();
+}
+
+// -------------------- setup --------------------
+void setup() {
+  // Serial for debugging
+  Serial.begin(115200);
+
+  initWiFi();
+  initWebSocket();
+
+  // Route for root / web page
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send_P(200, "text/html", index_html, processor);
+  });
+
+  server.begin();
+  Serial.println("HTTP server started");
+
+  // Configure steppers
+  stepper_X1.setMaxSpeed(200.0);
+  stepper_X1.setAcceleration(200.0);
+
+  stepper_Y.setMaxSpeed(200.0);
+  stepper_Y.setAcceleration(200.0);
+
+  // ESP32 requires attaching with explicit min/max pulse widths
+  penServo.attach(SERVO_PIN, 500, 2400);  
+  delay(300);
+
+  // Start with pen up (safer)
+  servoUp();
+
+  // No auto circle here – everything is triggered via WebSocket now.
+}
+
+// -------------------- loop --------------------
+void loop() {
+  // 1) Handle RESET request first (highest priority)
+  if (resetRequest) {
+    Serial.println("Resetting to (0,0)...");
+    // Lift pen, go back to origin in step space
+    servoUp();
+    moveBothToBlocking(0, 0);
+
+    // Reset internal position counters to 0,0
+    stepper_X1.setCurrentPosition(0);
+    stepper_Y.setCurrentPosition(0);
+
+    Serial.println("Position reset to (0,0).");
+    resetRequest = false;
+  }
+
+  // 2) Handle new XY move commands coming from the web UI (non-blocking)
+  if (newRequest) {
+    long targetX = steps_X.toInt();
+    long targetY = steps_Y.toInt();
+
+    // Put pen down before this move
+    servoDown();
+
+    // Set new target position for both axes
+    stepper_X1.moveTo(targetX);
+    stepper_Y.moveTo(targetY);
+
+    Serial.println("New move from web:");
+    Serial.print("  X -> "); Serial.println(targetX);
+    Serial.print("  Y -> "); Serial.println(targetY);
+
+    // Mark that we are now drawing
+    isDrawing = true;
+    newRequest = false;
+
+    ws.cleanupClients();
+  }
+
+  // 3) If we are drawing and both motors have reached their targets, lift pen once
+  if (isDrawing &&
+      stepper_X1.distanceToGo() == 0 &&
+      stepper_Y.distanceToGo() == 0) {
+
+    servoUp();
+    Serial.println("Move finished, pen up");
+    isDrawing = false;
+  }
+
+  // 4) Handle circle command (blocking pattern)
+  if (circleRequest) {
+    // Example circle parameters – you can tune these:
+    long radiusSteps = 100;  // radius in steps
+    int  segments    = 20;   // number of segments to approximate circle
+
+    drawCircle(radiusSteps, segments);
+    circleRequest = false;
+  }
+
+  // 5) Let AccelStepper drive steppers towards their current targets
+  stepper_X1.run();
+  stepper_Y.run();
+}

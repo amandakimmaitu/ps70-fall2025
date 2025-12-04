@@ -3,35 +3,205 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Watering System Override</title>
+  <title>Amanda's Greenhouse HQ 🌱</title>
+
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:24px}
-    .card{max-width:520px;border:1px solid #ddd;border-radius:12px;padding:16px}
-    button{font-size:1.05rem;padding:.55rem 1rem;margin-right:.5rem;border-radius:.6rem;border:1px solid #999;cursor:pointer}
-    .on{background:#e9ffe9}
-    .off{background:#ffe9e9}
-    .row{margin:.5rem 0}
-    code{background:#f7f7f7;padding:2px 6px;border-radius:6px}
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: "Courier New", Courier, monospace;
+      color: #222;
+
+      /* graph paper */
+      background-color: #fdfaf2;
+      background-image:
+        linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+      background-size: 24px 24px;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 1300px;
+      padding: 32px 24px 56px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2.8rem;
+    }
+    .subtitle { margin-bottom: 28px; font-size: 1rem; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+    @media (min-width: 900px) {
+      .cards { grid-template-columns: 1fr 1fr; }
+    }
+
+    .card {
+      border: 1px solid #000;
+      border-radius: 14px;
+      padding: 22px;
+      background: #fffef7;
+      box-shadow: 4px 4px 0 #000;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1.9rem;
+    }
+    .card h3 {
+      margin-top: 22px;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+      text-decoration: underline;
+    }
+
+    .row { margin: 4px 0; font-size: 1rem; }
+    .label { font-weight: 700; }
+    .value { font-family: inherit; }
+
+    /* green on / red off */
+    .state-on { color: #1c7a33; font-weight: 700; }
+    .state-off { color: #c03424; font-weight: 700; }
+
+    /* sticky buttons */
+    .sticky-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 12px;
+    }
+
+    .sticky-btn {
+      width: 180px;
+      height: 180px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease, opacity 0.12s ease, filter 0.12s ease;
+      position: relative;
+    }
+
+    .sticky-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* disabled in AUTO mode */
+    .disabled-sticky {
+      opacity: 0.35;
+      filter: grayscale(60%);
+      pointer-events: none;
+    }
+
+    /* soft glow behind active sticky */
+    .active-sticky {
+      position: relative;
+    }
+
+    .active-sticky::before {
+      content: "";
+      position: absolute;
+      top: -6px;
+      left: -6px;
+      right: -6px;
+      bottom: -6px;
+      border-radius: 16px;
+      background: rgba(255, 255, 180, 0.35); /* warm sticky-note glow */
+      z-index: -1;
+      filter: blur(3px);
+    }
   </style>
 </head>
+
 <body>
-  <div class="card">
-    <h2>Amanda's Awesome Greenhouse: Plant Watering Manual Override</h2>
-    <div class="row"><b>Pump:</b> <span id="pumpState">…</span></div>
-    <div class="row"><b>Dryness:</b> <span id="dryness">…</span></div>
-    <div class="row" style="margin-top:.6rem">
-      <button class="on"  id="turn-on">Start Watering!</button>
-      <button class="off" id="turn-off">Stop Watering!</button>
+  <div class="page">
+    <h1>Amanda's Greenhouse HQ</h1>
+    <div class="subtitle">
+      remote pump + light control
     </div>
+
+    <main class="cards">
+      <!-- 🌱 Pump -->
+      <section class="card">
+        <h2>🌱 Pump</h2>
+        <div class="row"><span class="label">mode:</span> <span id="pumpMode" class="value">…</span></div>
+        <div class="row"><span class="label">state:</span> <span id="pumpState" class="value">…</span></div>
+        <div class="row"><span class="label">dryness:</span> <span id="dryness" class="value">…</span></div>
+
+        <h3>mode</h3>
+        <div class="sticky-row">
+          <div class="sticky-btn" id="pump-set-auto">
+            <img src="PumpAuto.png" alt="Pump AUTO">
+          </div>
+          <div class="sticky-btn" id="pump-set-manual">
+            <img src="PumpManual.png" alt="Pump MANUAL">
+          </div>
+        </div>
+
+        <h3>manual control</h3>
+        <div class="sticky-row">
+          <div class="sticky-btn" id="pump-on">
+            <img src="PumpOn.png" alt="Pump ON">
+          </div>
+          <div class="sticky-btn" id="pump-off">
+            <img src="PumpOff.png" alt="Pump OFF">
+          </div>
+        </div>
+      </section>
+
+      <!-- 💡 Lights -->
+      <section class="card">
+        <h2>💡 Lights</h2>
+        <div class="row"><span class="label">mode:</span> <span id="lightsMode" class="value">…</span></div>
+        <div class="row"><span class="label">state:</span> <span id="lightsState" class="value">…</span></div>
+        <div class="row" style="font-size:0.9rem;margin-top:6px;">
+          AUTO = on from <span class="value">17:00 → 07:00</span>
+        </div>
+
+        <h3>mode</h3>
+        <div class="sticky-row">
+          <div class="sticky-btn" id="lights-set-auto">
+            <img src="LightsAuto.png" alt="Lights AUTO">
+          </div>
+          <div class="sticky-btn" id="lights-set-manual">
+            <img src="LightsManual.png" alt="Lights MANUAL">
+          </div>
+        </div>
+
+        <h3>manual control</h3>
+        <div class="sticky-row">
+          <div class="sticky-btn" id="lights-on">
+            <img src="LightsOn.png" alt="Lights ON">
+          </div>
+          <div class="sticky-btn" id="lights-off">
+            <img src="LightsOff.png" alt="Lights OFF">
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <!-- Firebase v7 SDKs to match your class instructions -->
+  <!-- Firebase JS -->
   <script src="https://www.gstatic.com/firebasejs/7.13.2/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/7.13.2/firebase-database.js"></script>
 
   <script>
-  // --- Your Firebase config (from console) ---
-  var firebaseConfig = {
+  /* ---------- Firebase ---------- */
+  firebase.initializeApp({
     apiKey: "AIzaSyAnMUmucc3e59XRT8SyUEI0sdq6PyPRTl0",
     authDomain: "watering-system-override.firebaseapp.com",
     databaseURL: "https://watering-system-override-default-rtdb.firebaseio.com",
@@ -39,43 +209,203 @@
     storageBucket: "watering-system-override.firebasestorage.app",
     messagingSenderId: "8484160068",
     appId: "1:8484160068:web:a3decbfbc160f699d3f211"
-  };
-  firebase.initializeApp(firebaseConfig);
-
-  // Database references
-  var db       = firebase.database();
-  var cmdRef   = db.ref("/pump/command");
-  var stateRef = db.ref("/pump/state");
-  var adcRef   = db.ref("/sensor/soilAdc");     // kept for background logging
-  var dryRef   = db.ref("/sensor/drynessPct");
-
-  // Elements
-  var pumpEl = document.getElementById('pumpState');
-  var dryEl  = document.getElementById('dryness');
-
-  // Buttons
-  document.getElementById('turn-on').addEventListener('click', function(){
-    cmdRef.set("ON");
-  }, false);
-
-  document.getElementById('turn-off').addEventListener('click', function(){
-    cmdRef.set("OFF");
-  }, false);
-
-  // Live UI updates
-  stateRef.on('value', function(snap){
-    if (pumpEl) pumpEl.textContent = snap.val() || 'UNKNOWN';
   });
 
-  dryRef.on('value', function(snap){
-    if (!dryEl) return;
-    var v = snap.val();
-    dryEl.textContent = (v !== null) ? (v + '%') : '—';
+  const db = firebase.database();
+
+  /* ---------- Refs ---------- */
+  const pumpModeRef    = db.ref("/pump/mode");
+  const pumpStateRef   = db.ref("/pump/state");
+  const pumpCmdRef     = db.ref("/pump/command");
+  const drynessRef     = db.ref("/sensor/drynessPct");
+
+  const lightsModeRef  = db.ref("/lights/mode");
+  const lightsStateRef = db.ref("/lights/state");
+  const lightsCmdRef   = db.ref("/lights/command");
+
+  /* ---------- DOM ---------- */
+  const pumpModeEl   = document.getElementById("pumpMode");
+  const pumpStateEl  = document.getElementById("pumpState");
+  const drynessEl    = document.getElementById("dryness");
+
+  const pumpOnEl     = document.getElementById("pump-on");
+  const pumpOffEl    = document.getElementById("pump-off");
+  const pumpAutoEl   = document.getElementById("pump-set-auto");
+  const pumpManualEl = document.getElementById("pump-set-manual");
+
+  const lightsModeEl   = document.getElementById("lightsMode");
+  const lightsStateEl  = document.getElementById("lightsState");
+  const lightsOnEl     = document.getElementById("lights-on");
+  const lightsOffEl    = document.getElementById("lights-off");
+  const lightsAutoEl   = document.getElementById("lights-set-auto");
+  const lightsManualEl = document.getElementById("lights-set-manual");
+
+  let currentPumpMode   = "AUTO";
+  let currentLightsMode = "AUTO";
+
+  /* ---------- UI helpers ---------- */
+
+  function updateManualUI() {
+    // Pump manual enables
+    if (currentPumpMode === "AUTO") {
+      pumpOnEl.classList.add("disabled-sticky");
+      pumpOffEl.classList.add("disabled-sticky");
+    } else {
+      pumpOnEl.classList.remove("disabled-sticky");
+      pumpOffEl.classList.remove("disabled-sticky");
+    }
+
+    // Lights manual enables
+    if (currentLightsMode === "AUTO") {
+      lightsOnEl.classList.add("disabled-sticky");
+      lightsOffEl.classList.add("disabled-sticky");
+    } else {
+      lightsOnEl.classList.remove("disabled-sticky");
+      lightsOffEl.classList.remove("disabled-sticky");
+    }
+  }
+
+  // tiny nudge wiggle when something becomes active
+  function nudgeSticky(el) {
+    if (!el) return;
+    const angle = parseFloat(el.dataset.baseRotation || "0");
+    el.style.transform = `translateY(-3px) rotate(${angle - 4}deg)`;
+    setTimeout(() => {
+      el.style.transform = `rotate(${angle}deg)`;
+    }, 160);
+  }
+
+  function setPumpModeGlow() {
+    pumpAutoEl.classList.remove("active-sticky");
+    pumpManualEl.classList.remove("active-sticky");
+    const target = (currentPumpMode === "AUTO") ? pumpAutoEl : pumpManualEl;
+    target.classList.add("active-sticky");
+    nudgeSticky(target);
+  }
+
+  function setLightsModeGlow() {
+    lightsAutoEl.classList.remove("active-sticky");
+    lightsManualEl.classList.remove("active-sticky");
+    const target = (currentLightsMode === "AUTO") ? lightsAutoEl : lightsManualEl;
+    target.classList.add("active-sticky");
+    nudgeSticky(target);
+  }
+
+  function setPumpStateGlow(v) {
+    pumpOnEl.classList.remove("active-sticky");
+    pumpOffEl.classList.remove("active-sticky");
+    const target = (v === "ON") ? pumpOnEl : pumpOffEl;
+    target.classList.add("active-sticky");
+    nudgeSticky(target);
+  }
+
+  function setLightsStateGlow(v) {
+    lightsOnEl.classList.remove("active-sticky");
+    lightsOffEl.classList.remove("active-sticky");
+    const target = (v === "ON") ? lightsOnEl : lightsOffEl;
+    target.classList.add("active-sticky");
+    nudgeSticky(target);
+  }
+
+  /* ---------- Button actions ---------- */
+
+  // Pump mode
+  pumpAutoEl.onclick   = () => pumpModeRef.set("AUTO");
+  pumpManualEl.onclick = () => pumpModeRef.set("MANUAL");
+
+  pumpModeRef.on("value", snap => {
+    currentPumpMode = snap.val() || "AUTO";
+    pumpModeEl.textContent = currentPumpMode;
+    updateManualUI();
+    setPumpModeGlow();
   });
 
-  // Background listener (optional)
-  adcRef.on('value', function(snap){
-    console.log("Soil ADC:", snap.val());
+  // Pump manual
+  pumpOnEl.onclick  = () => { if (currentPumpMode === "MANUAL") pumpCmdRef.set("ON"); };
+  pumpOffEl.onclick = () => { if (currentPumpMode === "MANUAL") pumpCmdRef.set("OFF"); };
+
+  // Pump state
+  pumpStateRef.on("value", snap => {
+    const v = snap.val() || "OFF";
+    pumpStateEl.textContent = v;
+    pumpStateEl.classList.remove("state-on","state-off");
+    pumpStateEl.classList.add(v === "ON" ? "state-on" : "state-off");
+    setPumpStateGlow(v);
+  });
+
+  // Dryness
+  drynessRef.on("value", snap => {
+    const v = snap.val();
+    drynessEl.textContent = (v !== null) ? v + "%" : "—";
+  });
+
+  // Lights mode
+  lightsAutoEl.onclick   = () => lightsModeRef.set("AUTO");
+  lightsManualEl.onclick = () => lightsModeRef.set("MANUAL");
+
+  lightsModeRef.on("value", snap => {
+    currentLightsMode = snap.val() || "AUTO";
+    lightsModeEl.textContent = currentLightsMode;
+    updateManualUI();
+    setLightsModeGlow();
+  });
+
+  // Lights manual
+  lightsOnEl.onclick  = () => { if (currentLightsMode === "MANUAL") lightsCmdRef.set("ON"); };
+  lightsOffEl.onclick = () => { if (currentLightsMode === "MANUAL") lightsCmdRef.set("OFF"); };
+
+  // Lights state
+  lightsStateRef.on("value", snap => {
+    const v = snap.val() || "OFF";
+    lightsStateEl.textContent = v;
+    lightsStateEl.classList.remove("state-on","state-off");
+    lightsStateEl.classList.add(v === "ON" ? "state-on" : "state-off");
+    setLightsStateGlow(v);
+  });
+
+  /* ---------- Tilt + basic hover/press wiggle ---------- */
+  document.addEventListener("DOMContentLoaded", ()=> {
+    const stickies = document.querySelectorAll(".sticky-btn");
+
+    stickies.forEach(sticky => {
+      const angle = (Math.random()*24 - 12).toFixed(2);
+      sticky.dataset.baseRotation = angle;
+      sticky.style.transform = `rotate(${angle}deg)`;
+    });
+
+    stickies.forEach(sticky => {
+      const base = () => parseFloat(sticky.dataset.baseRotation || "0");
+
+      sticky.addEventListener("mouseover", ()=>{
+        if(sticky.classList.contains("disabled-sticky")) return;
+        sticky.style.transform = `translateY(-4px) rotate(${base()-3}deg)`;
+      });
+
+      sticky.addEventListener("mouseout", ()=>{
+        sticky.style.transform = `rotate(${base()}deg)`;
+      });
+
+      sticky.addEventListener("mousedown", ()=>{
+        if(sticky.classList.contains("disabled-sticky")) return;
+        sticky.style.transform = `translateY(5px) scale(0.95) rotate(${base()*1.15}deg)`;
+      });
+
+      sticky.addEventListener("mouseup", ()=>{
+        sticky.style.transform = `rotate(${base()}deg)`;
+      });
+
+      sticky.addEventListener("touchstart", ()=>{
+        if(sticky.classList.contains("disabled-sticky")) return;
+        sticky.style.transform = `translateY(5px) scale(0.95) rotate(${base()*1.15}deg)`;
+      }, {passive: true});
+
+      sticky.addEventListener("touchend", ()=>{
+        sticky.style.transform = `rotate(${base()}deg)`;
+      });
+    });
+
+    // initial visual state
+    updateManualUI();
   });
   </script>
 </body>

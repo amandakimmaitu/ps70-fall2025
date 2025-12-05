@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Amanda's Greenhouse HQ</title>
+  <title>🪴 amanda's desktop greenhouse 🪴</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     /* ---------- GLOBAL ---------- */
@@ -35,6 +35,7 @@
       grid-template-columns: repeat(3, minmax(0, 1fr)); /* water, lights, plant */
       gap: 24px;
       align-items: flex-start;
+      position: relative;
     }
 
     .card {
@@ -44,10 +45,12 @@
       padding: 16px 18px 20px;
       box-shadow: 4px 4px 0 rgba(0,0,0,0.15);
       position: relative;
+      transition: box-shadow 0.15s ease;
     }
     .card h2 {
       margin: 0 0 8px;
       font-size: 1.3rem;
+      cursor: default;
     }
     .row {
       margin: 2px 0;
@@ -115,14 +118,20 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 420px;          /* visually similar column height */
+      min-height: 420px;
       padding-top: 12px;
+      position: relative;
+      transition: box-shadow 0.15s ease;
     }
     #plantWrapper {
       margin-top: 4px;
       width: 280px;
       height: 280px;
       position: relative;
+      cursor: grab;  /* handle for dragging */
+    }
+    #plantWrapper.dragging {
+      cursor: grabbing;
     }
     #plantImage {
       width: 100%;
@@ -133,7 +142,7 @@
 
     /* light and water overlays */
 
-    /* Softer, yellower, rounder glow */
+    /* Soft yellow sun glow */
     #lightEffect {
       position: absolute;
       inset: 0;
@@ -218,6 +227,34 @@
       100% { opacity: 0; }
     }
 
+    /* ---------- DRAGGABLE CARDS ---------- */
+    .draggable-handle {
+      cursor: grab;
+    }
+    .dragging .draggable-handle {
+      cursor: grabbing;
+    }
+
+    /* ---------- ORGANIZE BUTTON ---------- */
+    .organize-btn {
+      position: fixed;
+      bottom: 14px;
+      left: 16px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.8rem;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid #111;
+      background: rgba(255,255,255,0.95);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.18);
+      cursor: pointer;
+      z-index: 999;
+    }
+    .organize-btn:hover {
+      transform: translateY(1px);
+      box-shadow: 1px 1px 0 rgba(0,0,0,0.18);
+    }
+
     @media (max-width: 1050px) {
       .main-grid {
         grid-template-columns: minmax(0,1fr);
@@ -230,16 +267,14 @@
 </head>
 <body>
   <header>
-    <h1>Amanda's Greenhouse HQ</h1>
-    <div class="subtitle">
-      remote pump + light control, powered by Firebase &amp; sticky notes ✨
-    </div>
+    <h1>🪴 amanda's desktop greenhouse 🪴</h1>
   </header>
+  <br>
 
-  <main class="main-grid">
+  <main class="main-grid" id="mainGrid">
     <!-- ---------- WATER COLUMN ---------- -->
-    <section class="card" id="water-card">
-      <h2>💧 Water</h2>
+    <section class="card draggable" id="water-card">
+      <h2 class="draggable-handle">💧 water! 💧</h2>
       <div class="row"><span class="label">mode:</span> <span id="pumpModeText" class="value">AUTO</span></div>
       <div class="row"><span class="label">state:</span> <span id="pumpStateText" class="value state-off">OFF</span></div>
       <div class="row"><span class="label">dryness:</span> <span id="drynessText" class="value">–%</span></div>
@@ -264,14 +299,11 @@
         </div>
       </div>
 
-      <div class="row small" style="margin-top:8px;">
-        (manual stickies only do anything when water mode is <b>MANUAL</b>)
-      </div>
     </section>
 
     <!-- ---------- LIGHTS COLUMN ---------- -->
-    <section class="card" id="lights-card">
-      <h2>💡 Lights</h2>
+    <section class="card draggable" id="lights-card">
+      <h2 class="draggable-handle">💡 lights! 💡</h2>
       <div class="row"><span class="label">mode:</span> <span id="lightsModeText" class="value">AUTO</span></div>
       <div class="row"><span class="label">state:</span> <span id="lightsStateText" class="value state-off">OFF</span></div>
       <div class="row small">
@@ -298,13 +330,10 @@
         </div>
       </div>
 
-      <div class="row small" style="margin-top:8px;">
-        (manual stickies only do anything when lights mode is <b>MANUAL</b>)
-      </div>
     </section>
 
-    <!-- ---------- PLANT COLUMN (NO CARD) ---------- -->
-    <section class="plant-panel" id="plant-panel">
+    <!-- ---------- PLANT COLUMN (DRAGGABLE AS A UNIT, HANDLE = PLANT) ---------- -->
+    <section class="plant-panel draggable" id="plant-panel">
       <div id="plantWrapper">
         <img id="plantImage" src="1.png" alt="Plant stage">
         <div id="lightEffect"></div>
@@ -322,6 +351,9 @@
       </div>
     </section>
   </main>
+
+  <!-- organize me button -->
+  <button class="organize-btn" id="organizeBtn">organize me</button>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/7.13.2/firebase-app.js"></script>
@@ -609,6 +641,86 @@
       }
       lastLightsState = v;
     });
+
+    // ---------- DRAGGABLE CARDS (transform-based, no layout changes) ----------
+    (function() {
+      var draggables = Array.prototype.slice.call(
+        document.querySelectorAll(".draggable")
+      );
+      var zCounter = 5;
+
+      draggables.forEach(function(card) {
+        var handle;
+
+        if (card.id === "plant-panel") {
+          // plant panel: use plantWrapper as handle
+          handle = document.getElementById("plantWrapper");
+        } else {
+          handle = card.querySelector(".draggable-handle") || card;
+        }
+
+        var offsetX = 0;
+        var offsetY = 0;
+        var startX, startY;
+        var dragging = false;
+
+        handle.addEventListener("mousedown", function(e) {
+          if (e.button !== 0) return; // left click only
+          e.preventDefault();
+
+          dragging = true;
+          if (card.id === "plant-panel") {
+            handle.classList.add("dragging");
+          } else {
+            card.classList.add("dragging");
+          }
+          card.style.zIndex = ++zCounter;
+
+          startX = e.clientX;
+          startY = e.clientY;
+
+          // read current translate if any
+          var st = window.getComputedStyle(card);
+          var m = new WebKitCSSMatrix(st.transform);
+          offsetX = m.m41;
+          offsetY = m.m42;
+
+          document.addEventListener("mousemove", onMove);
+          document.addEventListener("mouseup", onUp);
+        });
+
+        function onMove(e) {
+          if (!dragging) return;
+          var dx = e.clientX - startX;
+          var dy = e.clientY - startY;
+          var tx = offsetX + dx;
+          var ty = offsetY + dy;
+          card.style.transform = "translate(" + tx + "px," + ty + "px)";
+        }
+
+        function onUp() {
+          if (!dragging) return;
+          dragging = false;
+          card.classList.remove("dragging");
+          if (card.id === "plant-panel") {
+            handle.classList.remove("dragging");
+          }
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+        }
+      });
+
+      // organize me: reset transforms → back to clean 3-column layout
+      var organizeBtn = document.getElementById("organizeBtn");
+      if (organizeBtn) {
+        organizeBtn.addEventListener("click", function() {
+          draggables.forEach(function(card) {
+            card.style.transform = "translate(0px,0px)";
+            card.style.zIndex = "";
+          });
+        });
+      }
+    })();
   </script>
 </body>
 </html>

@@ -23,8 +23,148 @@
 <div class="textcontainer">
 <p class="margin"></p>
 
-<h3>TBD!</h3>
+<h1>🪴 The Desktop Greenhouse 🪴</h1>
 
+<br></br>
+
+<img src="cover.png" alt="cover" class="center">
+
+<br></br>
+
+<h2><strong>Background</strong></h2>
+
+<p class="p3">For my final project, I designed a <a href="https://amandakimmaitu.github.io/ps70-fall2025/01_intro/index.html">smart miniature&nbsp;desktop greenhouse</a>. I love my community garden plot at Stanford and wanted to recreate those good vibes in a compact form that could live on my desk.</p>
+
+<br></br>
+
+<h2><strong>Design process: ELECTRONICS</strong></h2>
+
+<p class="p3">This project integrated several input and output devices:</p>
+<ul>
+<li>
+<p class="p1">A capacitive soil moisture sensor to detect when the soil is dry</p>
+</li>
+<li>
+<p class="p1">An irrigation system that waters the plant when dryness is detected</p>
+</li>
+<li>
+<p class="p1">LED grow lights on a timer to provide supplemental light when natural sunlight is insufficient</p>
+</li>
+</ul>
+<p class="p3">The most challenging component was designing a reliable watering system. Initially, I envisioned a misting system that would fog the interior of the greenhouse, which I thought would be visually beautiful. While this was technically feasible using an atomizer available in the lab, further research showed that excess humidity could promote leaf and root rot.</p>
+
+<p class="p3">As a result, I pivoted to a more practical drip irrigation system. When the soil moisture falls below a set threshold, the system activates a water pump that draws water from a reservoir and delivers it through airline tubing. The tubing ends in a capped outlet that allows water to drip directly into the plant pot. The pump is driven by an L9110 motor driver.</p>
+
+<p class="p3">The remaining electronics were more straightforward. I reused the moisture sensor setup I developed during <a href="https://amandakimmaitu.github.io/ps70-fall2025/07_outputs/index.html">MVP week</a>, including the dryness threshold logic. The LED strip is controlled on a simple timer, turning on and off automatically based on predefined intervals.</p>
+
+<img src="IMG_9758.jpg" alt="electronics" class="center">
+<p style="text-align: center;"><em>Final electronics setup about to be soldered</em></p>
+
+<br></br>
+
+<h2><strong>Design Process: HARDWARE + ENCLOSURE</strong></h2>
+
+<p class="p3">For the physical enclosure, I explored several concepts before settling on a stacked, modular design composed of three layers (from top to bottom):</p>
+<ul>
+<li>
+<p class="p1"><span class="s1"><strong>Greenhouse body:</strong></span> laser-cut clear acrylic</p>
+</li>
+<li>
+<p class="p1"><span class="s1"><strong>Electronics enclosure:</strong></span> a plywood drawer for easy access and maintenance</p>
+</li>
+<li>
+<p class="p1"><span class="s1"><strong>Water reservoir:</strong></span> a watertight, 3D-printed container</p>
+</li>
+</ul>
+<p class="p2">Achieving a clean, cohesive enclosure was (unexpectedly!) the most difficult part of the project. I aimed to align all three layers into a single, neat vertical column. The top two layers are finger-jointed boxes, which required multiple rounds of prototyping to fine-tune kerf tolerances and correctly place holes for the pump, wiring, and cable management.</p>
+
+<img src="Prototypes.png" alt="prototypes" class="center">
+<p style="text-align: center;"><em>So many enclosure prototypes ...</em></p>
+
+<p class="p3">The water reservoir proved especially challenging. I initially fabricated it as a finger-jointed acrylic box with an internal shelf to support the electronics drawer. I experimented with several waterproofing methods&mdash;including superglue, silicone caulk, and inserting a vacuum-formed plastic liner&mdash;but these approaches either leaked or looked visually unappealing. Ultimately, I switched to a fully 3D-printed reservoir with a fitted vacuum-formed insert, which remained watertight throughout demo day.</p>
+
+<p class="p3">To finish the system, I made a ceramic plant pot with drainage holes and a matching dish, glazing them in a bright yellow to complement the overall aesthetic and help the plant visually stand out.</p>
+
+<br></br>
+
+<h2><strong>Bill of materials</strong></h2>
+<ul>
+<li>
+<p class="p1">1 &times; ESP32 microcontroller</p>
+</li>
+<li>
+<p class="p1">1 &times; ElectroCookie solderable perf board</p>
+</li>
+<li>
+<p class="p1">1 &times; L9110 motor driver</p>
+</li>
+<li>
+<p class="p1">1 &times; capacitive soil moisture sensor</p>
+</li>
+<li>
+<p class="p1">1 &times; LED strip</p>
+</li>
+<li>
+<p class="p1">1 &times; water pump</p>
+</li>
+<li>
+<p class="p1">~1 m airline tubing</p>
+</li>
+<li>
+<p class="p1">2 &times; airline tubing connectors</p>
+</li>
+<li>
+<p class="p1">2 &times; M2 &times; 20 mm screws (motor mounting)</p>
+</li>
+<li>
+<p class="p1">2 &times; M2 nuts</p>
+</li>
+<li>
+<p class="p1">Assorted wires</p>
+</li>
+<li>
+<p class="p1">Plywood (electronics enclosure)</p>
+</li>
+<li>
+<p class="p1">PLA filament (water reservoir)</p>
+</li>
+<li>
+<p class="p1">Clear acrylic (greenhouse body)</p>
+</li>
+<li>
+<p class="p1">Stoneware clay and glaze (plant pot and dish)</p>
+</li>
+</ul>
+
+<br></br>
+
+<h2><strong>Design process: SOFTWARE</strong></h2>
+<p class="p3">I wanted the greenhouse to be engaging during demo day, even when the sensor readings didn&rsquo;t trigger frequent changes. Building on <a href="https://amandakimmaitu.github.io/ps70-fall2025/09_networking/index.html">my work from IoT week</a>, I created a web interface that&nbsp;uses Firebase to allow the greenhouse to be controlled from anywhere in the world.</p>
+<p class="p3">Both the watering system and the lights have <span class="s2">two modes</span>:</p>
+<ul>
+<li>
+<p class="p1"><span class="s1"><strong>Auto mode</strong></span>, which responds to sensor readings and timers</p>
+</li>
+<li>
+<p class="p1"><span class="s1"><strong>Manual mode</strong></span>, which allows direct user control through the website</p>
+</li>
+</ul>
+<p class="p3">For the UI, I leaned into the &ldquo;maker&rdquo; aesthetic of the course. I hand-drew the buttons on Post-its and scanned them in, giving the interface a playful, tactile feel. I also added a small plant-growing animation that activates whenever the lights or water are turned on, regardless of whether the system is in auto or manual mode.</p>
+
+<img src="Interface.png" alt="interface" class="center">
+<p style="text-align: center;"><em>Web interface for my desktop greenhouse</em></p>
+
+<br></br>
+
+<h2><strong>Reflections + future extensions</strong></h2>
+
+<p class="p3">Overall, this project was a success and a&nbsp;meaningful learning experience. One of the biggest takeaways was understanding the balance between aesthetics and function. Designing polished enclosures and integrating electronics into them took significantly more time and iteration than I expected, and it was eye-opening to see how challenging it is to move from working input/output devices to a fully integrated, robust system.</p>
+
+<p class="p3">For future iterations, I would like to upgrade the grow lights to something more horticulturally effective, as the LED strip is likely insufficient for meaningful plant growth (Xander&rsquo;s setup convinced me). I&rsquo;d also love to explore alternative greenhouse forms beyond the stacked-cube design&mdash;such as a mini A-frame, a rounded enclosure, or more integrated use of kerf-cut wood and acrylic.</p>
+
+<p class="p3">Finally, thank you so much to Nathan and the entire PS 70 course staff for their patience, support, and willingness to answer my many questions. I learned more in this class than I have doing anything else in recent memory. And thanks to Ally and Evan for the great ideas&mdash;and for enthusiastically playing with my greenhouse from afar! :-)</p>
+
+<img src="IMG_0472.jpeg" alt="tne end" class="center">
 
 </div>
 </xmp>

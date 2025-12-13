@@ -31,6 +31,15 @@
 
 <br></br>
 
+<div style="text-align: center;">
+  <video width="600" controls>
+    <source src="The Desktop Greenhouse.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
+<br></br>
+
 <h2><strong>Background</strong></h2>
 
 <p class="p3">For my final project, I designed a <a href="https://amandakimmaitu.github.io/ps70-fall2025/01_intro/index.html">smart miniature&nbsp;desktop greenhouse</a>. I love my community garden plot at Stanford and wanted to recreate those good vibes in a compact form that could live on my desk.</p>
@@ -55,10 +64,217 @@
 
 <p class="p3">As a result, I pivoted to a more practical drip irrigation system. When the soil moisture falls below a set threshold, the system activates a water pump that draws water from a reservoir and delivers it through airline tubing. The tubing ends in a capped outlet that allows water to drip directly into the plant pot. The pump is driven by an L9110 motor driver.</p>
 
-<p class="p3">The remaining electronics were more straightforward. I reused the moisture sensor setup I developed during <a href="https://amandakimmaitu.github.io/ps70-fall2025/07_outputs/index.html">MVP week</a>, including the dryness threshold logic. The LED strip is controlled on a simple timer, turning on and off automatically based on predefined intervals.</p>
-
 <img src="IMG_9758.jpg" alt="electronics" class="center">
 <p style="text-align: center;"><em>Final electronics setup about to be soldered</em></p>
+
+<p class="p3">The remaining electronics were more straightforward. I reused the moisture sensor setup I developed during <a href="https://amandakimmaitu.github.io/ps70-fall2025/07_outputs/index.html">MVP week</a>, including the dryness threshold logic. The LED strip is controlled on a simple timer, turning on and off automatically based on predefined intervals. Microcontroller code is below:</p>
+
+<!-- ====== Arduino Code Block (Scrollable, Copyable) ====== -->
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css">
+
+<style>
+  .codewrap {
+    position: relative;
+    max-height: 600px;
+    overflow: auto;
+    background: #f7f7f7;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+  }
+
+  .copybtn {
+    position: sticky;
+    top: 10px;
+    float: right;
+    margin: 10px;
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font: 600 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    z-index: 10;
+  }
+
+  pre {
+    margin: 0;
+    padding: 16px;
+    background: transparent;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+                 "Liberation Mono", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre;
+  }
+
+  pre code,
+  pre code * {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+  }
+
+  .codewrap pre::selection,
+  .codewrap pre *::selection {
+    background: #cce4ff !important;
+    color: #000 !important;
+  }
+  .codewrap pre::-moz-selection,
+  .codewrap pre *::-moz-selection {
+    background: #cce4ff !important;
+    color: #000 !important;
+  }
+</style>
+
+<div class="codewrap">
+  <button class="copybtn" onclick="copyArduinoCode(this)">Copy</button>
+
+<pre><code id="arduino-code" class="language-cpp">
+#include &lt;WiFi.h&gt;
+#include &lt;Firebase_ESP_Client.h&gt;
+#include &lt;time.h&gt;
+#include &lt;Adafruit_NeoPixel.h&gt;
+
+// -------------- WiFi --------------
+const char* WIFI_SSID = "MAKERSPACE";
+const char* WIFI_PASS = "12345678";
+
+// -------------- Firebase --------------
+#define API_KEY      "AIzaSyAnMUmucc3e59XRT8SyUEI0sdq6PyPRTl0"
+#define DATABASE_URL "https://watering-system-override-default-rtdb.firebaseio.com"
+
+FirebaseData   fbdo;
+FirebaseAuth   auth;
+FirebaseConfig config;
+
+// -------------- Pins --------------
+const int SOIL_PIN = 34;   // moisture sensor
+const int AIA_PIN  = 27;   // pump driver
+const int AIB_PIN  = 14;   // pump driver
+const int LED_PIN  = 13;   // NeoPixel data
+
+// -------------- NeoPixel strip --------------
+#define NUM_LEDS 8
+Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// -------------- Soil calibration --------------
+int WET_ADC = 1150;
+int DRY_ADC = 3000;
+
+// -------------- Auto-watering thresholds --------------
+const int DRY_ON_THRESHOLD  = 70;
+const int DRY_OFF_THRESHOLD = 40;
+
+// -------------- Time / lights schedule --------------
+const long GMT_OFFSET_SEC      = -5 * 3600;
+const int  DAYLIGHT_OFFSET_SEC = 0;
+const int LIGHTS_ON_HOUR  = 17;
+const int LIGHTS_OFF_HOUR = 7;
+
+// -------------- Pump state --------------
+bool pumpOn       = false;
+bool pumpAutoMode = true;
+
+// -------------- Lights state --------------
+bool lightsOn       = false;
+bool lightsAutoMode = true;
+
+// -------------- Helpers --------------
+int clampi(int v, int lo, int hi) {
+  return v &lt; lo ? lo : (v &gt; hi ? hi : v);
+}
+
+int drynessPercent(int adc) {
+  float f = float(adc - WET_ADC) / float(DRY_ADC - WET_ADC);
+  return clampi(int(f * 100.0f), 0, 100);
+}
+
+void pumpSet(bool on) {
+  pumpOn = on;
+  digitalWrite(AIA_PIN, on ? HIGH : LOW);
+  digitalWrite(AIB_PIN, LOW);
+}
+
+void lightsSet(bool on) {
+  lightsOn = on;
+  uint32_t c = on ? strip.Color(255,255,255) : strip.Color(0,0,0);
+  for (int i = 0; i &lt; NUM_LEDS; i++) strip.setPixelColor(i, c);
+  strip.show();
+}
+
+void ensureWifi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) delay(300);
+}
+
+int currentLocalHour() {
+  struct tm t;
+  if (!getLocalTime(&t)) return -1;
+  return t.tm_hour;
+}
+
+// -------------- Setup --------------
+void setup() {
+  Serial.begin(115200);
+  pinMode(AIA_PIN, OUTPUT);
+  pinMode(AIB_PIN, OUTPUT);
+
+  strip.begin();
+  strip.setBrightness(80);
+  strip.show();
+
+  analogReadResolution(12);
+
+  ensureWifi();
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC,
+             "pool.ntp.org", "time.nist.gov");
+
+  config.api_key      = API_KEY;
+  config.database_url = DATABASE_URL;
+  Firebase.signUp(&config, &auth, "", "");
+  Firebase.begin(&config, &auth);
+}
+
+// -------------- Main loop --------------
+void loop() {
+  int adc    = analogRead(SOIL_PIN);
+  int dryPct = drynessPercent(adc);
+
+  if (pumpAutoMode) {
+    if (!pumpOn &amp;&amp; dryPct &gt;= DRY_ON_THRESHOLD) pumpSet(true);
+    if (pumpOn &amp;&amp; dryPct &lt;= DRY_OFF_THRESHOLD) pumpSet(false);
+  }
+
+  if (lightsAutoMode) {
+    int h = currentLocalHour();
+    if (h &gt;= 0) {
+      bool shouldOn = (h &gt;= LIGHTS_ON_HOUR || h &lt; LIGHTS_OFF_HOUR);
+      if (shouldOn != lightsOn) lightsSet(shouldOn);
+    }
+  }
+
+  delay(5);
+}
+</code></pre>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-cpp.min.js"></script>
+
+<script>
+  function copyArduinoCode(btn) {
+    const code = document.getElementById("arduino-code").textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      const old = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = old, 1200);
+    });
+  }
+</script>
+
+<!-- ====== /Arduino Code Block ====== -->
 
 <br></br>
 
